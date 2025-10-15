@@ -5,15 +5,6 @@ import hashlib
 from urllib.parse import urlencode
 import json
 
-# Your Binance API credentials
-# Those are live credentials
-# API_KEY = 'zzDb6h2fpvawjXqdZSzPTXrWTxQQTAxGjjqfkCKaU85kx0DZeZe9CbuiC2UMLu1n'
-# API_SECRET = 'DiRsNytB9t4vfi77q6zpLVhw3ozCxAVvGFUnMffz7b01AuF2hdrw6uIkLTKI6D2K'
-
-# Those are test credentials
-API_KEY = '0tjl3JlxuBgs60yfMPnT1mQAPXKboCQjEG1wpLlblQe0Ab26cbxqriRFSrSYyU76'
-API_SECRET = 'V1Auz9PwxFCJH11daLRNf3BIp5zbJZjiaGueDxBsUY0zvfMfR4UIZAa9M7VvnJun'
-
 # Binance API endpoints
 # BASE_URL = 'https://api.binance.com'  # For Spot (if needed)
 BASE_URL = 'https://testnet.binance.vision'
