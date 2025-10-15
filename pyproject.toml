@@ -17,6 +17,7 @@ scikit-learn = "^1.7.1"
 bt = "^1.1.2"
 pyportfolioopt = "^1.5.6"
 python-binance = "^1.0.30"
+python-dotenv = "^1.1.1"
 
 
 [build-system]

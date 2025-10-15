@@ -1,8 +1,12 @@
 import pandas as pd
 from datetime import date
 import requests
+import os
+from dotenv import load_dotenv
 
-API_KEY = '0b814d7d-6053-46e9-a736-cdfd80c6ca69'
+load_dotenv()
+
+API_KEY = os.getenv('COINAPI_API_KEY')
 headers = {'X-CoinAPI-Key': API_KEY}
 
 def get(url, params=None):
