@@ -10,14 +10,13 @@ API_KEY = os.getenv('COINAPI_API_KEY')
 headers = {'X-CoinAPI-Key': API_KEY}
 
 def get(url, params=None):
-    request = requests.get(url, headers=headers, params=params)
-    if request.status_code != 200:
-        raise ValueError(f'HTTP status code {request.status_code}: {request.text}')
-    return request.json()
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+    return response.json()
 
 def get_history(symbol, start_time, end_time=date.today()):
     '''
-    Get historical data for a symbol.
+    Get historical data for a single symbol.
     '''
     # CoinAPI returns max 100 results; use fewer than this
     print(f'Fetching {symbol} from {start_time} to {end_time} …')
@@ -66,11 +65,15 @@ def get_historical_symbols(exchange_id, page=1, symbols=[], base_currency='USD')
     print(f'Out of {len(historical)} historical, {len(base_currency_history)} are {base_currency}-based')
     all_symbols =  symbols + base_currency_history
     if len(historical) == 1000:
-        return get_historical_symbols(exchange_id, page+1, all_symbols)
+        return get_historical_symbols(exchange_id, page+1, all_symbols, base_currency)
     else:
         return all_symbols
 
 def convert_df(coinapi_df):
+    """
+    Just reformats Coinapi data into a more readable format (e.g. 'volume' instead of
+    'volume_traded'), uses data as index.
+    """
     new_df = pd.DataFrame()
     new_df['date'] = pd.to_datetime(coinapi_df['time_period_end'])
     new_df['open'] = coinapi_df['price_open']

@@ -3,15 +3,16 @@ from pathlib import Path
 import pandas as pd
 
 
-def get_files(directory):
+def get_files(directory, exchange):
     return [
         os.path.join(directory, f)
         for f in os.listdir(directory)
-        if f.endswith('.csv') and f.startswith('COINBASE_SPOT_')
+        if f.endswith('.csv') and f.startswith(f'{exchange.upper()}_SPOT_')
     ]
 
-def read(column_name):
+def read(column_name, data_dir, exchange, base_currency):
     '''
+    Reads existing Coinbase data (CSV files) from file system.
     Returns a DF with one column per crypto and a row for every date that cointains data.
     
     Parameters
@@ -20,21 +21,25 @@ def read(column_name):
         The name of the CSV column to read ('close', 'open', 'high', 'low', 'volume', 'trades')
     '''
 
-    data_dir = '../coinapi_data/'
-    historical_files = get_files(os.path.join(data_dir, 'historical'))
+    historical_files = get_files(os.path.join(data_dir, 'historical'), exchange=exchange)
+    print(f'Got {len(historical_files)} historical files')
 
     all_crypto = {}
 
     # Filter out all stable coins – too boring to trade; source: ChatGPT
     stable_assets = ['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'FRAX', 'USDP', 'GUSD', 'PYUSD', 'EURS', 'EUROC', 'sEUR', 'XSGD', 'CNHT', 'BRZ', 'TRYB', 'JPYC', 'XAUT', 'PAXG', 'HUSD', 'USDN', 'UST', 'USTC', 'AMPL', 'FEI', 'sUSD']
 
+    prefix_to_remove = f'{exchange.upper()}_SPOT_'
+    suffix_to_remove = f'_{base_currency.upper()}'
+    print(f'Remove {prefix_to_remove} and {suffix_to_remove}')
     # Get all files as [name, path]
     files = [
         # Careful here; there's a crypto called COINBASE_SPOT_BTC_USD_5C85E9.csv; 5C8… must stay or
         # it will overwrite BTC.
-        [Path(filename).stem.removeprefix('COINBASE_SPOT_').removesuffix('_USD'), os.path.join(data_dir, filename)]
+        [Path(filename).stem.removeprefix(prefix_to_remove).removesuffix(suffix_to_remove), os.path.join(data_dir, filename)]
         for filename in historical_files
     ]
+    print('Read files', files)
 
     non_stables = [entry for entry in files if entry[0] not in stable_assets]
 
