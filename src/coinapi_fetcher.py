@@ -11,7 +11,8 @@ headers = {'X-CoinAPI-Key': API_KEY}
 
 def get(url, params=None):
     response = requests.get(url, headers=headers, params=params)
-    response.raise_for_status()
+    if not response.ok:
+        raise requests.HTTPError(f'{response.status_code} {response.reason}: {response.text}', response=response)
     return response.json()
 
 def get_history(symbol, start_time, end_time=date.today()):
@@ -48,6 +49,9 @@ def get_active_symbols(exchange_id, base_currency='USD'):
         'filter_asset_id': base_currency,
     }
     active = get(f'https://rest.coinapi.io/v1/symbols/{exchange_id}/active', params)
+    if active:
+        print(f'Sample response item keys: {list(active[0].keys())}')
+        print(f'Sample response item: {active[0]}')
     return [coin['symbol_id'] for coin in active if coin['symbol_id'].endswith(f'_{base_currency}')]
 
 def get_historical_symbols(exchange_id, page=1, symbols=[], base_currency='USD'):
