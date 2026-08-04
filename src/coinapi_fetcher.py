@@ -10,15 +10,15 @@ API_KEY = os.getenv('COINAPI_API_KEY')
 headers = {'X-CoinAPI-Key': API_KEY}
 
 def get(url, params=None):
+    # Thin wrapper around requests.get that injects the API key and raises on non-2xx.
     response = requests.get(url, headers=headers, params=params)
     if not response.ok:
         raise requests.HTTPError(f'{response.status_code} {response.reason}: {response.text}', response=response)
     return response.json()
 
 def get_history(symbol, start_time, end_time=date.today()):
-    '''
-    Get historical data for a single symbol.
-    '''
+    # Fetches daily OHLCV bars for one symbol between start_time and end_time.
+    # Returns an empty DataFrame if CoinAPI has no data for that range yet.
     # CoinAPI returns max 100 results; use fewer than this
     print(f'Fetching {symbol} from {start_time} to {end_time} …')
     # Fetch until end_time is reached *or* get the next full batch
@@ -41,9 +41,7 @@ def get_history(symbol, start_time, end_time=date.today()):
     return result
 
 def get_active_symbols(exchange_id, base_currency='USD'):
-    '''
-    Gets active symbols; returns their symbol_ids
-    '''
+    # Returns symbol_ids of currently-listed spot pairs quoted in base_currency.
     print(f'Get active symbols for {exchange_id}')
     params = {
         'filter_asset_id': base_currency,
@@ -55,9 +53,7 @@ def get_active_symbols(exchange_id, base_currency='USD'):
     return [coin['symbol_id'] for coin in active if coin['symbol_id'].endswith(f'_{base_currency}')]
 
 def get_historical_symbols(exchange_id, page=1, symbols=[], base_currency='USD'):
-    '''
-    Gets "delisted" symbols; needs pagination; returns their symbol_ids
-    '''
+    # Returns symbol_ids of delisted pairs; paginates recursively since CoinAPI caps at 1k per page.
     print(f'Get historical symbols for {exchange_id}, adding to {len(symbols)} existing')
     params = {
         # 1k is the max allowed (or at least the max it returns)
@@ -74,10 +70,7 @@ def get_historical_symbols(exchange_id, page=1, symbols=[], base_currency='USD')
         return all_symbols
 
 def convert_df(coinapi_df):
-    """
-    Just reformats Coinapi data into a more readable format (e.g. 'volume' instead of
-    'volume_traded'), uses data as index.
-    """
+    # Renames CoinAPI fields to shorter names and sets the date as index.
     new_df = pd.DataFrame()
     new_df['date'] = pd.to_datetime(coinapi_df['time_period_end'])
     new_df['open'] = coinapi_df['price_open']

@@ -1,10 +1,31 @@
-import papermill as pm
+import marimo
 
-notebooks = [
-    ('src/fetch_coinapi.ipynb', 'out/fetch_coinapi.ipynb'),
-    ('src/create_index.ipynb', 'out/create_index.ipynb'),
-    ('src/backtest.ipynb', 'out/backtest.ipynb'),
-]
+__generated_with = "0.23.9"
+app = marimo.App(width="medium")
 
-for input, output in notebooks:
-    pm.execute_notebook(input, output, cwd='src')
+
+@app.cell
+def __():
+    import marimo as mo
+    mo.md("""
+    # Crypto Index Strategy — Workflow
+
+    Run the three notebooks below in order:
+
+    1. **`fetch_coinapi.py`** — Download new OHLCV data from CoinAPI
+    2. **`create_index.py`** — Rebuild the index and index weights from raw data
+    3. **`run_backtest.py`** — Run the backtest and export `signal.csv`
+    4. **`trade.py`** — Execute trades on Binance based on the latest signal
+
+    ```
+    marimo run src/fetch_coinapi.py
+    marimo run src/create_index.py
+    marimo run src/run_backtest.py
+    marimo run src/trade.py
+    ```
+    """)
+    return ()
+
+
+if __name__ == "__main__":
+    app.run()
