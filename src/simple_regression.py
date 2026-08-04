@@ -6,6 +6,8 @@ from typing import NamedTuple
 # To use apply/rolling, we must pass in a function that only takes the rolling window as an
 # input; therefore, we define beforehand what type of data we wont to get returned.
 def create_regression(type):
+    # Factory that returns a rolling-apply-compatible function for the requested metric.
+    # Only computes on Mondays (our rebalance day) to avoid redundant work on daily data.
 
     def get_linear_regression(series: pd.Series) -> float:
         """

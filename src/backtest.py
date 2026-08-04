@@ -1,6 +1,8 @@
 import bt
 
 def run(strategy_name, data, weights):
+    # Weekly rebalance into a single asset (the index) with a time-varying target weight.
+    # weights is a Series of 0/1 (or fractional) values aligned to data's index.
   strategy = bt.Strategy(
       strategy_name,
       [

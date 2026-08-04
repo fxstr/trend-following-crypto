@@ -1,14 +1,5 @@
 def get_order_sizes(current, future):
-    '''
-    Gets order sizes from current and future position sizes. 
-
-    Parameters:
-        current: dict of current positions (symbol -> size)
-        future: dict of future positions (symbol -> size)
-
-    Returns:
-        dict of order sizes (symbol -> size)
-    '''
+    # Returns the delta between current and future positions, omitting coins with no change.
 
     orders = {}
     

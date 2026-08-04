@@ -4,6 +4,8 @@ from scipy.optimize import minimize
 
 # Use Ledoit Wolf to get a Maximum Diversion portfolio
 def calculate_weights(data):
+    # Returns maximum-diversification weights for the assets in data.
+    # Uses Ledoit-Wolf covariance shrinkage to reduce estimation error on short histories.
 
     # Empty df gives an emptay result
     if (data.empty):
@@ -21,6 +23,7 @@ def calculate_weights(data):
 
     # Objective: negative diversion ratio (to maximize it)
     def objective(weights):
+        # Negated so scipy.minimize maximises the diversification ratio.
         weighted_std = np.dot(weights, std_devs)
         portfolio_std = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
         diversion_ratio = weighted_std / portfolio_std
