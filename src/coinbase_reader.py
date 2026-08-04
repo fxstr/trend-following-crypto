@@ -4,6 +4,7 @@ import pandas as pd
 
 
 def get_files(directory, exchange):
+    # Returns full paths of all SPOT CSVs for the given exchange in directory.
     return [
         os.path.join(directory, f)
         for f in os.listdir(directory)
@@ -11,23 +12,16 @@ def get_files(directory, exchange):
     ]
 
 def read(column_name, data_dir, exchange, base_currency):
-    '''
-    Reads existing Coinbase data (CSV files) from file system.
-    Returns a DF with one column per crypto and a row for every date that cointains data.
-    
-    Parameters
-    ----------
-    column_name : str
-        The name of the CSV column to read ('close', 'open', 'high', 'low', 'volume', 'trades')
-    '''
+    # Reads one column (e.g. 'close') from all historical CSVs and returns a wide DataFrame
+    # with one column per coin. Stablecoins/fiat pairs are excluded — they have no signal
+    # for trend-following.
 
+    # get_files() already returns full paths (os.path.join(directory, f)); don't re-join
+    # data_dir onto them below.
     historical_files = get_files(os.path.join(data_dir, 'historical'), exchange=exchange)
     print(f'Got {len(historical_files)} historical files')
 
     all_crypto = {}
-
-    # Filter out all stable coins – too boring to trade; source: ChatGPT
-    stable_assets = ['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'FRAX', 'USDP', 'GUSD', 'PYUSD', 'EURS', 'EUROC', 'sEUR', 'XSGD', 'CNHT', 'BRZ', 'TRYB', 'JPYC', 'XAUT', 'PAXG', 'HUSD', 'USDN', 'UST', 'USTC', 'AMPL', 'FEI', 'sUSD']
 
     prefix_to_remove = f'{exchange.upper()}_SPOT_'
     suffix_to_remove = f'_{base_currency.upper()}'
@@ -36,21 +30,33 @@ def read(column_name, data_dir, exchange, base_currency):
     files = [
         # Careful here; there's a crypto called COINBASE_SPOT_BTC_USD_5C85E9.csv; 5C8… must stay or
         # it will overwrite BTC.
-        [Path(filename).stem.removeprefix(prefix_to_remove).removesuffix(suffix_to_remove), os.path.join(data_dir, filename)]
+        [Path(filename).stem.removeprefix(prefix_to_remove).removesuffix(suffix_to_remove), filename]
         for filename in historical_files
     ]
     print('Read files', files)
 
-    non_stables = [entry for entry in files if entry[0] not in stable_assets]
-
     # Get CSVs as DFs
-    for [name, file_path] in non_stables:
+    for [name, file_path] in files:
         df = pd.read_csv(file_path)
         # Things fail if there's not a single row; make sure there is before we parse dates
         if (len(df) > 0):
             df['date'] = pd.to_datetime(df['date'])
             df.set_index('date', inplace=True)
             all_crypto[name] = df
+
+    # Detect stablecoins/fiat pairs by price behaviour instead of a hand-maintained ticker
+    # list — the list went stale (missed USD1, FDUSD, EUR, which all sat in the live index
+    # basket). A real coin's daily-return std is at least 3%+ even for the least volatile
+    # ones (BTC ~3.5%); every $1-pegged or fiat-tracking instrument checked is under 0.5%.
+    stable_std_threshold = 0.01
+    stable_names = [
+        name for name, df in all_crypto.items()
+        if df['close'].pct_change().std() < stable_std_threshold
+    ]
+    if stable_names:
+        print(f'Excluding {len(stable_names)} stablecoin/fiat pairs (low volatility):', stable_names)
+        for name in stable_names:
+            del all_crypto[name]
 
     result = pd.concat([df[column_name].rename(name) for name, df in all_crypto.items()], axis=1)
     return result
