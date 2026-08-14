@@ -31,13 +31,18 @@ def __(Client, os):
     CASH_ASSETS = {'USDT', 'USD'}
     BUYING_POWER_MARGIN = 0.98
     DUST_THRESHOLD_USDT = 1.0
+    # Binance Simple Earn Flexible USDT product — parks idle cash (the strategy
+    # sits in CASH ~70% of the time historically) instead of earning nothing.
+    # Flexible (not Locked) specifically because redemption must be instant: the
+    # signal can flip to LONG on any weekly check and needs the cash back immediately.
+    EARN_PRODUCT_ID = 'USDT001'
 
     client = Client(
         os.getenv('BINANCE_API_KEY'),
         os.getenv('BINANCE_API_SECRET'),
         testnet=os.getenv('BINANCE_TEST_API', '').lower() == 'true',
     )
-    return (BUYING_POWER_MARGIN, CASH_ASSETS, COIN_NAME_MAP, DUST_THRESHOLD_USDT, client)
+    return (BUYING_POWER_MARGIN, CASH_ASSETS, COIN_NAME_MAP, DUST_THRESHOLD_USDT, EARN_PRODUCT_ID, client)
 
 
 @app.cell
@@ -92,7 +97,43 @@ def __(COIN_NAME_MAP, Path, datetime, mo, pd, timedelta):
 
 
 @app.cell
-def __(BUYING_POWER_MARGIN, CASH_ASSETS, DUST_THRESHOLD_USDT, client, mo):
+def __(EARN_PRODUCT_ID, client, mo, target_weights, time):
+    # Simple Earn balances don't show up in client.get_account()['balances'] — if
+    # the signal is LONG, redeem everything back to spot first so the buying-power
+    # calc below (and the actual orders) see the true available cash.
+    #
+    # earn_redeemed_amount is returned (not just used locally) purely so the
+    # holdings cell below can take it as a parameter — marimo schedules cells by
+    # data dependency, not file position, so without a real variable link there is
+    # no guarantee this cell finishes before the balance snapshot is taken.
+    earn_redeemed_amount = 0.0
+    if len(target_weights):
+        _earn_position = client.get_simple_earn_flexible_product_position(asset='USDT')
+        earn_redeemed_amount = sum(float(p['totalAmount']) for p in _earn_position.get('rows', []))
+        if earn_redeemed_amount > 0:
+            # Pass the exact amount instead of redeemAll=True: python-binance stringifies
+            # Python bools as "True"/"False" (capital) with no conversion to the lowercase
+            # true/false Binance's API expects — untested and unverifiable without a live
+            # redemption, so avoid the ambiguity entirely rather than trust it works.
+            client.redeem_simple_earn_flexible_product(
+                productId=EARN_PRODUCT_ID, amount=f'{earn_redeemed_amount:.8f}'
+            )
+            time.sleep(3)  # flexible redemption credits spot almost immediately, but not synchronously
+
+    redeemed_notice = (
+        mo.md(f'Redeemed {earn_redeemed_amount:.2f} USDT from Simple Earn back to spot.')
+        if earn_redeemed_amount > 0 else mo.md('')
+    )
+    redeemed_notice
+    return (earn_redeemed_amount,)
+
+
+@app.cell
+def __(BUYING_POWER_MARGIN, CASH_ASSETS, DUST_THRESHOLD_USDT, client, earn_redeemed_amount, mo):
+    # earn_redeemed_amount is unused directly here — taking it as a parameter forces
+    # marimo to run the Earn-redeem cell above before this balance snapshot, since
+    # cells are scheduled by data dependency, not file position.
+    del earn_redeemed_amount
     ticker_prices = {t['symbol']: float(t['price']) for t in client.get_all_tickers()}
 
     account_balances = client.get_account()['balances']
@@ -180,7 +221,18 @@ def __(mo):
 
 
 @app.cell
-def __(client, execute_button, mo, order_deltas, round_to_lot_size, ticker_prices, time):
+def __(
+    DUST_THRESHOLD_USDT,
+    EARN_PRODUCT_ID,
+    client,
+    execute_button,
+    mo,
+    order_deltas,
+    round_to_lot_size,
+    target_weights,
+    ticker_prices,
+    time,
+):
     mo.stop(not execute_button.value, mo.md("Click **Execute trades** above to place orders."))
 
     # print() isn't visible in `marimo run` app mode — accumulate lines and render
@@ -207,6 +259,21 @@ def __(client, execute_button, mo, order_deltas, round_to_lot_size, ticker_price
                 _log.append(f'{_side} {_rounded_amount} {_coin} — **Error:** {e}')
             time.sleep(5)
             _bar.update()
+
+    # CASH week (nothing to hold long): whatever USDT sold trades settled into is
+    # otherwise sitting idle until the next signal check — park it in Simple Earn
+    # Flexible instead. Skipped on a LONG week since that cash is meant to stay
+    # deployed in coins, not earning the much smaller Earn APY.
+    if not len(target_weights):
+        _free_usdt = float(client.get_asset_balance(asset='USDT')['free'])
+        if _free_usdt >= DUST_THRESHOLD_USDT:
+            try:
+                client.subscribe_simple_earn_flexible_product(
+                    productId=EARN_PRODUCT_ID, amount=f'{_free_usdt:.8f}'
+                )
+                _log.append(f'Parked {_free_usdt:.2f} USDT in Simple Earn Flexible')
+            except Exception as e:
+                _log.append(f'Failed to park {_free_usdt:.2f} USDT in Simple Earn — **Error:** {e}')
 
     mo.md('  \n'.join(['**Execution log:**', *_log]) if _log else '**Execution log:** nothing to do.')
     return ()
